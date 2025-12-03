@@ -22,7 +22,7 @@ router.post('/upload/:userId', authenticate, (req, res, next) => {
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    const fileUrl = `/uploads/${req.file.filename}`;
+    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
 
     const message = new Message({
       sender: currentUserId,
@@ -64,7 +64,17 @@ router.get('/:userId', authenticate, async (req, res) => {
       .populate('receiver', 'username avatar')
       .sort({ createdAt: 1 });
 
-    res.json(messages);
+    // Ensure file URLs are absolute so the frontend can load them directly
+    const host = `${req.protocol}://${req.get('host')}`;
+    const messagesWithAbsoluteUrls = messages.map((m) => {
+      const obj = m.toObject();
+      if (obj.file && obj.file.url && obj.file.url.startsWith('/')) {
+        obj.file.url = host + obj.file.url;
+      }
+      return obj;
+    });
+
+    res.json(messagesWithAbsoluteUrls);
   } catch (error) {
     console.error('Get messages error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
