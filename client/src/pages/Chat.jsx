@@ -285,6 +285,9 @@ const Chat = () => {
 
       <div className="chat-sidebar">
         <div className="sidebar-header">
+          <div className="app-title">
+            <h1>chatis</h1>
+          </div>
           <div className="me">
             <div style={{ fontSize: '13px', opacity: 0.9 }}>👤 Signed in as</div>
             <strong>{user?.username}</strong>
