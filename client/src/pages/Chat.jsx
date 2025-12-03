@@ -11,7 +11,11 @@ const Chat = () => {
   const [content, setContent] = useState('');
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [typingUsers, setTypingUsers] = useState({});
+  const [notifications, setNotifications] = useState([]);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const inputRef = useRef(null);
+  const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
   const currentUserId = user?.id || user?._id;
@@ -62,11 +66,19 @@ const Chat = () => {
       });
     };
 
+    const handleNotification = (notification) => {
+      setNotifications((n) => [...n, { ...notification, id: Date.now() }]);
+      setTimeout(() => {
+        setNotifications((n) => n.filter((notif) => notif.id !== notification.id + Date.now()));
+      }, 4000);
+    };
+
     socket.on('users:online', handleUsersOnline);
     socket.on('message:receive', handleMessageReceive);
     socket.on('message:sent', handleMessageSent);
     socket.on('typing:start', handleTypingStart);
     socket.on('typing:stop', handleTypingStop);
+    socket.on('notification:new', handleNotification);
 
     return () => {
       socket.off('users:online', handleUsersOnline);
@@ -74,6 +86,7 @@ const Chat = () => {
       socket.off('message:sent', handleMessageSent);
       socket.off('typing:start', handleTypingStart);
       socket.off('typing:stop', handleTypingStop);
+      socket.off('notification:new', handleNotification);
     };
   }, [socket, selectedUser]);
 
@@ -132,7 +145,51 @@ const Chat = () => {
     }
 
     setContent('');
+    setSelectedFile(null);
     inputRef.current?.focus();
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size must be less than 10MB');
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
+
+  const handleFileUpload = async (e) => {
+    e.preventDefault();
+    if (!selectedFile || !selectedUser) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('content', content.trim());
+
+      const token = localStorage.getItem('token');
+      const receiverId = selectedUser._id || selectedUser.id;
+
+      const res = await axios.post(`/api/messages/upload/${receiverId}`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      setMessages((m) => [...m, res.data]);
+      setContent('');
+      setSelectedFile(null);
+      inputRef.current?.focus();
+    } catch (err) {
+      console.error('Upload error', err);
+      alert('Failed to upload file');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleInput = (e) => {
@@ -186,10 +243,23 @@ const Chat = () => {
         {messages.map((m) => {
           const senderId = m.sender?._id?.toString() || m.sender?.id;
           const isMine = senderId === (currentUserId?.toString());
+          const getFileIcon = (mimetype) => {
+            if (mimetype?.startsWith('image/')) return '🖼️';
+            if (mimetype?.startsWith('video/')) return '🎬';
+            if (mimetype?.startsWith('audio/')) return '🎵';
+            if (mimetype?.includes('pdf')) return '📄';
+            if (mimetype?.includes('word')) return '📝';
+            return '📎';
+          };
           return (
             <div key={m._id} className={`message-item ${isMine ? 'mine' : 'theirs'}`}>
               {!isMine && <div className="msg-sender">{m.sender?.username}</div>}
-              <div className="msg-content">{m.content}</div>
+              {m.file && (
+                <a href={m.file.url} target="_blank" rel="noopener noreferrer" className="msg-file">
+                  {getFileIcon(m.file.mimetype)} {m.file.originalName}
+                </a>
+              )}
+              {m.content && <div className="msg-content">{m.content}</div>}
               <div className="msg-time">{new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
             </div>
           );
@@ -204,6 +274,15 @@ const Chat = () => {
 
   return (
     <div className="chat-container">
+      {/* Notifications */}
+      <div className="notifications-container">
+        {notifications.map((notif) => (
+          <div key={notif.id} className="notification">
+            <span>🔔 {notif.from?.username}: {notif.content}</span>
+          </div>
+        ))}
+      </div>
+
       <div className="chat-sidebar">
         <div className="sidebar-header">
           <div className="me">
@@ -227,16 +306,34 @@ const Chat = () => {
         <div className="chat-body">{renderMessages()}</div>
 
         <div className="chat-input">
-          <form onSubmit={handleSend} className="send-form">
+          {selectedFile && (
+            <div className="file-preview">
+              📎 {selectedFile.name} ({(selectedFile.size / 1024).toFixed(2)} KB)
+              <button type="button" onClick={() => setSelectedFile(null)} className="remove-file">✕</button>
+            </div>
+          )}
+          <form onSubmit={selectedFile ? handleFileUpload : handleSend} className="send-form">
             <input
               ref={inputRef}
               type="text"
               placeholder={selectedUser ? `Message ${selectedUser.username}...` : 'Select a user to start typing'}
               value={content}
               onChange={handleInput}
-              disabled={!selectedUser}
+              disabled={!selectedUser || uploading}
             />
-            <button type="submit" disabled={!selectedUser || !content.trim()}>Send</button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              onChange={handleFileSelect}
+              style={{ display: 'none' }}
+              accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+            />
+            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!selectedUser || uploading} className="file-btn">
+              📎
+            </button>
+            <button type="submit" disabled={(!selectedUser || !content.trim()) && !selectedFile || uploading}>
+              {uploading ? 'Uploading...' : 'Send'}
+            </button>
           </form>
         </div>
       </div>

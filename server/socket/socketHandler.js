@@ -54,10 +54,10 @@ export const socketHandler = (io) => {
     // Handle sending messages
     socket.on('message:send', async (data) => {
       try {
-        const { receiverId, content } = data;
+        const { receiverId, content, file } = data;
 
-        if (!receiverId || !content) {
-          socket.emit('message:error', { message: 'Receiver ID and content are required' });
+        if (!receiverId || (!content && !file)) {
+          socket.emit('message:error', { message: 'Receiver ID and content/file are required' });
           return;
         }
 
@@ -65,7 +65,8 @@ export const socketHandler = (io) => {
         const message = new Message({
           sender: socket.userId,
           receiver: receiverId,
-          content: content.trim()
+          content: content ? content.trim() : '',
+          file: file || null
         });
 
         await message.save();
@@ -79,6 +80,17 @@ export const socketHandler = (io) => {
         
         // Also emit back to sender for confirmation
         socket.emit('message:sent', message);
+
+        // Send notification to receiver
+        socket.to(receiverId).emit('notification:new', {
+          type: 'message',
+          from: {
+            id: socket.userId,
+            username: socket.username
+          },
+          content: content ? content.substring(0, 50) : '📎 Sent a file',
+          timestamp: new Date()
+        });
 
       } catch (error) {
         console.error('Send message error:', error);
