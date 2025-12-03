@@ -23,32 +23,36 @@ const storage = multer.diskStorage({
   }
 });
 
-// File filter
+// File filter - Accept common file types with size limit
 const fileFilter = (req, file, cb) => {
   // Allow images, documents, and videos
   const allowedMimes = [
     'image/jpeg',
+    'image/jpg',
     'image/png',
     'image/gif',
     'image/webp',
+    'image/bmp',
     'application/pdf',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'video/mp4',
     'video/mpeg',
     'audio/mpeg',
-    'audio/wav'
+    'audio/wav',
+    'text/plain'
   ];
 
-  if (allowedMimes.includes(file.mimetype) && file.size <= 10 * 1024 * 1024) { // 10MB max
-    cb(null, true);
-  } else {
-    cb(new Error('Invalid file type or size exceeds 10MB'), false);
+  if (!allowedMimes.includes(file.mimetype)) {
+    return cb(new Error(`File type not allowed: ${file.mimetype}`), false);
   }
+
+  cb(null, true);
 };
 
+// Create multer instance
 export const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB max
 });

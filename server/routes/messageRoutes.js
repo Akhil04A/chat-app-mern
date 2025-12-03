@@ -5,31 +5,15 @@ import { upload } from '../middleware/upload.js';
 
 const router = express.Router();
 
-// Get messages between two users
-router.get('/:userId', authenticate, async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const currentUserId = req.user._id;
-
-    const messages = await Message.find({
-      $or: [
-        { sender: currentUserId, receiver: userId },
-        { sender: userId, receiver: currentUserId }
-      ]
-    })
-      .populate('sender', 'username avatar')
-      .populate('receiver', 'username avatar')
-      .sort({ createdAt: 1 });
-
-    res.json(messages);
-  } catch (error) {
-    console.error('Get messages error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-});
-
-// Upload file with message
-router.post('/upload/:userId', authenticate, upload.single('file'), async (req, res) => {
+// Upload file with message (MUST be before GET /:userId to avoid route conflicts)
+router.post('/upload/:userId', authenticate, (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ message: err.message });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     const { userId } = req.params;
     const currentUserId = req.user._id;
@@ -61,6 +45,29 @@ router.post('/upload/:userId', authenticate, upload.single('file'), async (req, 
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ message: 'Upload failed', error: error.message });
+  }
+});
+
+// Get messages between two users
+router.get('/:userId', authenticate, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentUserId = req.user._id;
+
+    const messages = await Message.find({
+      $or: [
+        { sender: currentUserId, receiver: userId },
+        { sender: userId, receiver: currentUserId }
+      ]
+    })
+      .populate('sender', 'username avatar')
+      .populate('receiver', 'username avatar')
+      .sort({ createdAt: 1 });
+
+    res.json(messages);
+  } catch (error) {
+    console.error('Get messages error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
