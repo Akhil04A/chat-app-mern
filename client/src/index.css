@@ -1,0 +1,50 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  min-height: 100vh;
+  color: #333;
+}
+
+code {
+  font-family: 'Courier New', monospace;
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Remove default button styles */
+button {
+  font-family: inherit;
+}
+
+/* Remove input focus outline (we have custom focus styles) */
+input, textarea {
+  font-family: inherit;
+}
+
+/* Better focus outline for accessibility */
+:focus {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
